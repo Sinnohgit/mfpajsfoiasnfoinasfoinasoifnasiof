@@ -19,7 +19,7 @@
     iframe.src = "about:blank";
     win.document.body.appendChild(iframe);
 
-    // --- Game HTML (same file, embedded) ---
+    // --- Game HTML (embedded) ---
     const GAME_HTML = `<!doctype html><html><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Neon Rift</title>
@@ -46,18 +46,18 @@ addEventListener("mousedown",()=>mouse.down=true);addEventListener("mouseup",()=
 let audio=null;function sfx(type,gain=0.06,pitch=440,dur=0.08){try{audio??=new(window.AudioContext||window.webkitAudioContext)();const t0=audio.currentTime;const o=audio.createOscillator();const g=audio.createGain();o.type=type;o.frequency.setValueAtTime(pitch,t0);g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(gain,t0+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);o.connect(g).connect(audio.destination);o.start(t0);o.stop(t0+dur+0.02)}catch{}}
 const toast=document.getElementById("toast");
 const WORLD={w:2600,h:1800};const bullets=[],enemies=[],particles=[];
-const COL={bg0:"#060616",bg1:"#0a0a22",p1:"#50f1ff",p2:"#ff5be5"};
-function makePlayer(id){const isP1=id===1;return{ id,name:isP1?"P1":"P2",x:WORLD.w*(isP1?0.35:0.65),y:WORLD.h*0.5,vx:0,vy:0,r:16,hp:100,hpMax:100,energy:100,energyMax:100,dashCd:0,fireCd:0,alive:true,spread:0,pierce:0,crit:0,combo:1,comboT:0};}
+const COL={p1:"#50f1ff",p2:"#ff5be5"};
+function makePlayer(id){const isP1=id===1;return{ id,x:WORLD.w*(isP1?0.35:0.65),y:WORLD.h*0.5,vx:0,vy:0,r:16,hp:100,hpMax:100,energy:100,energyMax:100,fireCd:0,alive:true,combo:1,comboT:0,score:0};}
 let P1=makePlayer(1),P2=makePlayer(2);let coop=true;
-let state="menu",tPrev=now(),wave=1,waveTimer=0,difficulty=1,globalScore=0,shake=0;
+let state="menu",tPrev=now(),wave=1,waveTimer=0,globalScore=0,shake=0;
 const ENEMY_TYPES={grunt:{r:16,hp:35,spd:1.15,score:25,col:"#79ffdf"},skater:{r:14,hp:22,spd:1.85,score:30,col:"#9ab0ff"},tank:{r:26,hp:120,spd:0.65,score:80,col:"#ffcf7d"}};
 function keepInWorld(p){const pad=40;p.x=clamp(p.x,p.r+pad,WORLD.w-p.r-pad);p.y=clamp(p.y,p.r+pad,WORLD.h-p.r-pad)}
-function spawnEnemy(type,x,y){const T=ENEMY_TYPES[type];enemies.push({type,x,y,vx:0,vy:0,r:T.r,hp:T.hp,hpMax:T.hp,spd:T.spd*(0.9+0.2*Math.random()),val:T.score,col:T.col,alive:true});}
-function spawnWave(n){const count=Math.floor(6+n*1.6);for(let i=0;i<count;i++){const edge=randi(4);const x=edge===0?40:edge===1?WORLD.w-40:rand(WORLD.w-120,120);const y=edge===2?40:edge===3?WORLD.h-40:rand(WORLD.h-120,120);let type="grunt";const roll=Math.random();if(n>2&&roll<0.18)type="skater";if(n>6&&roll<0.08)type="tank";spawnEnemy(type,x,y)}toast.textContent=\`Wave \${n}\`;setTimeout(()=>toast.textContent="",900)}
+function spawnEnemy(type,x,y){const T=ENEMY_TYPES[type];enemies.push({type,x,y,vx:0,vy:0,r:T.r,hp:T.hp,hpMax:T.hp,spd:T.spd*(0.9+0.2*Math.random()),val:T.score,col:T.col,alive:true,l:0});}
+function spawnWave(n){const count=Math.floor(6+n*1.6);for(let i=0;i<count;i++){const edge=randi(4);const x=edge===0?40:edge===1?WORLD.w-40:rand(WORLD.w-120,120);const y=edge===2?40:edge===3?WORLD.h-40:rand(WORLD.h-120,120);let type="grunt";const roll=Math.random();if(n>2&&roll<0.18)type="skater";if(n>6&&roll<0.08)type="tank";spawnEnemy(type,x,y)}toast.textContent=`Wave ${n}`;setTimeout(()=>toast.textContent="",900)}
 function puff(x,y,col,n=18,sp=3,life=700){for(let i=0;i<n;i++){const a=rand(TAU),s=rand(sp,0.2);particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rand(3,1),col,life,age:0})}}
-function fireBullet(owner,x,y,dx,dy,speed,dmg,life=1000,size=3,pierce=0){const v=hypot(dx,dy)||1;bullets.push({owner,x,y,vx:dx/v*speed,vy:dy/v*speed,dmg,r:size,pierce,born:now(),life})}
+function fireBullet(owner,x,y,dx,dy,speed,dmg,life=900,size=3){const v=hypot(dx,dy)||1;bullets.push({owner,x,y,vx:dx/v*speed,vy:dy/v*speed,dmg,r:size,born:now(),life})}
 function hitPlayer(p,dmg){p.hp-=dmg;shake=Math.min(22*DPR,shake+8*DPR);puff(p.x,p.y,p.id===1?COL.p1:COL.p2,18,3.6,600);if(p.hp<=0)p.alive=false}
-function hitEnemy(attacker,e,dmg){e.hp-=dmg;attacker.comboT=1400;attacker.combo=Math.min(8,attacker.combo+0.08);attacker.score=(attacker.score||0)+Math.floor(dmg*attacker.combo);globalScore+=Math.floor(dmg*attacker.combo);if(e.hp<=0){e.alive=false;attacker.score+=e.val;globalScore+=e.val;puff(e.x,e.y,e.col,30,4,800)}}
+function hitEnemy(attacker,e,dmg){e.hp-=dmg;attacker.comboT=1400;attacker.combo=Math.min(8,attacker.combo+0.08);attacker.score+=Math.floor(dmg*attacker.combo);globalScore+=Math.floor(dmg*attacker.combo);if(e.hp<=0){e.alive=false;attacker.score+=e.val;globalScore+=e.val;puff(e.x,e.y,e.col,30,4,800)}}
 function makeView(y0,h,player){return{x0:0,y0,w:W,h,player,camX:0,camY:0}}
 function updateView(v){const p=v.player;v.camX=clamp(p.x-v.w/2,0,WORLD.w-v.w);v.camY=clamp(p.y-v.h/2,0,WORLD.h-v.h)}
 function updatePlayer(p,dt,view){if(!p.alive)return;p.comboT-=dt;if(p.comboT<=0){p.comboT=0;p.combo=lerp(p.combo,1,0.02)}
@@ -68,14 +68,14 @@ p.vx*=Math.pow(0.997,dt);p.vy*=Math.pow(0.997,dt);
 p.x+=p.vx;p.y+=p.vy;keepInWorld(p);p.energy=Math.min(p.energyMax,p.energy+dt*0.03);
 let aimX,aimY;if(p.id===1){aimX=view.camX+(mouse.x-view.x0);aimY=view.camY+(mouse.y-view.y0)}else{let best=null,bd=1e9;for(const e of enemies){if(!e.alive)continue;const d=(e.x-p.x)**2+(e.y-p.y)**2;if(d<bd){bd=d;best=e}}aimX=best?best.x:WORLD.w/2;aimY=best?best.y:WORLD.h/2}
 p.fireCd=Math.max(0,p.fireCd-dt);const shooting=p.id===1?mouse.down:keys.has("Enter");
-if(shooting&&p.fireCd<=0&&p.energy>=2){p.energy-=2;p.fireCd=Math.max(70,160-wave*3);const dx=aimX-p.x,dy=aimY-p.y;const baseSp=10.5*DPR,dmg=11;fireBullet(p,p.x,p.y,dx,dy,baseSp,dmg,900,3.2,0);sfx("triangle",0.03,560+(p.id===1?0:80),0.04)}
+if(shooting&&p.fireCd<=0&&p.energy>=2){p.energy-=2;p.fireCd=Math.max(70,160-wave*3);const dx=aimX-p.x,dy=aimY-p.y;fireBullet(p,p.x,p.y,dx,dy,10.5*DPR,11);sfx("triangle",0.03,560+(p.id===1?0:80),0.04)}
 }
 function updateEnemies(dt){for(const e of enemies){if(!e.alive)continue;const t=(P1.alive?P1:P2.alive?P2:null);if(!t)continue;const dx=t.x-e.x,dy=t.y-e.y;const d=hypot(dx,dy)||1;const ux=dx/d,uy=dy/d;
 e.vx=lerp(e.vx,ux*e.spd*DPR,0.03*dt);e.vy=lerp(e.vy,uy*e.spd*DPR,0.03*dt);
 e.x+=e.vx;e.y+=e.vy;keepInWorld(e);
 const bump=(p)=>{if(!p.alive)return;const dd=(e.x-p.x)**2+(e.y-p.y)**2,rr=(e.r+p.r+2)**2;if(dd<rr){hitPlayer(p,12);p.vx+=(p.x-e.x)*0.01*DPR;p.vy+=(p.y-e.y)*0.01*DPR}};bump(P1);bump(P2);
 }}
-function updateBullets(dt){const t=now();for(let i=bullets.length;i--;){const b=bullets[i];b.x+=b.vx;b.y+=b.vy;if(t-b.born>b.life){bullets.splice(i,1);continue}
+function updateBullets(){const t=now();for(let i=bullets.length;i--;){const b=bullets[i];b.x+=b.vx;b.y+=b.vy;if(t-b.born>b.life){bullets.splice(i,1);continue}
 if(b.owner===P1||b.owner===P2){for(const e of enemies){if(!e.alive)continue;const rr=e.r+b.r+2,dd=(b.x-e.x)**2+(b.y-e.y)**2;if(dd<rr*rr){hitEnemy(b.owner,e,b.dmg);bullets.splice(i,1);break}}}else{
 const hit=(p)=>{if(!p.alive)return false;const rr=p.r+b.r+2,dd=(b.x-p.x)**2+(b.y-p.y)**2;if(dd<rr*rr){hitPlayer(p,b.dmg);bullets.splice(i,1);return true}return false};hit(P1)||hit(P2)}}
 }
@@ -83,27 +83,30 @@ function updateParticles(dt){for(let i=particles.length;i--;){const p=particles[
 function drawView(v){ctx.save();ctx.beginPath();ctx.rect(v.x0,v.y0,v.w,v.h);ctx.clip();
 ctx.fillStyle="#07071a";ctx.fillRect(v.x0,v.y0,v.w,v.h);
 for(const e of enemies){if(!e.alive)continue;const sx=(e.x-v.camX)+v.x0,sy=(e.y-v.camY)+v.y0;ctx.fillStyle=e.col;ctx.beginPath();ctx.arc(sx,sy,e.r,0,TAU);ctx.fill()}
-for(const b of bullets){const sx=(b.x-v.camX)+v.x0,sy=(b.y-v.camY)+v.y0;ctx.fillStyle=(b.owner===P1||b.owner===P2)?"#e9f7ff":"#ffd4a3";ctx.beginPath();ctx.arc(sx,sy,b.r,0,TAU);ctx.fill()}
+for(const b of bullets){const sx=(b.x-v.camX)+v.x0,sy=(b.y-v.camY)+v.y0;ctx.fillStyle="#e9f7ff";ctx.beginPath();ctx.arc(sx,sy,b.r,0,TAU);ctx.fill()}
 for(const p of particles){const sx=(p.x-v.camX)+v.x0,sy=(p.y-v.camY)+v.y0;ctx.globalAlpha=1-(p.age/p.life);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(sx,sy,Math.max(0.6*DPR,p.r),0,TAU);ctx.fill();ctx.globalAlpha=1}
 const pl=v.player;if(pl.alive){const sx=(pl.x-v.camX)+v.x0,sy=(pl.y-v.camY)+v.y0;ctx.fillStyle="#dfe8ff";ctx.beginPath();ctx.arc(sx,sy,pl.r,0,TAU);ctx.fill()}
 ctx.restore()}
 function draw(){ctx.fillStyle="#000";ctx.fillRect(0,0,W,H);
 const v1=makeView(0,coop?H/2:H,P1),v2=coop?makeView(H/2,H/2,P2):null;updateView(v1);if(v2)updateView(v2);
 drawView(v1);if(v2)drawView(v2);
-ctx.fillStyle="#ffffff2a";ctx.font=\`\${11*DPR}px system-ui\`;ctx.fillText("freegameslist.blog",10*DPR,H-10*DPR);
-if(state==="menu"){ctx.fillStyle="rgba(0,0,0,0.65)";ctx.fillRect(0,0,W,H);ctx.fillStyle="#fff";ctx.font=\`\${42*DPR}px system-ui\`;ctx.fillText("NEON RIFT",W/2-ctx.measureText("NEON RIFT").width/2,H*0.4);
-ctx.font=\`\${14*DPR}px system-ui\`;const m="Click to start";ctx.fillText(m,W/2-ctx.measureText(m).width/2,H*0.4+30*DPR)}
+ctx.fillStyle="#ffffff2a";ctx.font=`${11*DPR}px system-ui`;ctx.fillText("freegameslist.blog",10*DPR,H-10*DPR);
+if(state==="menu"){ctx.fillStyle="rgba(0,0,0,0.65)";ctx.fillRect(0,0,W,H);ctx.fillStyle="#fff";ctx.font=`${42*DPR}px system-ui`;ctx.fillText("NEON RIFT",W/2-ctx.measureText("NEON RIFT").width/2,H*0.4);
+ctx.font=`${14*DPR}px system-ui`;const m="Click to start";ctx.fillText(m,W/2-ctx.measureText(m).width/2,H*0.4+30*DPR)}
 }
 addEventListener("pointerdown",()=>{if(state==="menu"){bullets.length=enemies.length=particles.length=0;P1=makePlayer(1);P2=makePlayer(2);wave=1;waveTimer=0;spawnWave(1);state="play"}},{passive:true});
 function step(){const t=now();const dt=clamp(t-tPrev,0,33);tPrev=t;
-if(state==="play"){waveTimer-=dt;if(enemies.filter(e=>e.alive).length===0&&waveTimer<=0){spawnWave(wave);wave++;waveTimer=1400;difficulty=1+wave*0.06}
+if(state==="play"){waveTimer-=dt;if(enemies.filter(e=>e.alive).length===0&&waveTimer<=0){spawnWave(wave);wave++;waveTimer=1400}
 const v1=makeView(0,coop?H/2:H,P1),v2=coop?makeView(H/2,H/2,P2):null;updateView(v1);if(v2)updateView(v2);
 updatePlayer(P1,dt,v1);if(v2)updatePlayer(P2,dt,v2);
-updateEnemies(dt);updateBullets(dt);updateParticles(dt);
+updateEnemies(dt);updateBullets();updateParticles(dt);
 if(!P1.alive&&!P2.alive)state="menu"}
 draw();requestAnimationFrame(step)}
 requestAnimationFrame(step);
 })();<\/script></body></html>`;
+
+    // Base64-encode GAME_HTML to avoid parser issues and </script> edge cases
+    const GAME_B64 = btoa(unescape(encodeURIComponent(GAME_HTML)));
 
     // --- Menu shell inside iframe ---
     const SHELL = `<!doctype html><html><head><meta charset="utf-8"/>
@@ -142,21 +145,32 @@ requestAnimationFrame(step);
   <div class="wm">freegameslist.blog</div>
 </div></div>
 <script>
-  const GAME_HTML = ${JSON.stringify(GAME_HTML)};
+  const GAME_B64 = ${JSON.stringify(GAME_B64)};
+  const pre = ${JSON.stringify(String(prefillUrl||""))};
+
+  const decodeB64 = (b64) => decodeURIComponent(escape(atob(b64)));
+
   document.getElementById("play").onclick = () => {
-    document.open(); document.write(GAME_HTML); document.close();
+    // Avoid document.write() completely: use a blob URL
+    const html = decodeB64(GAME_B64);
+    const blob = new Blob([html], { type: "text/html" });
+    location.href = URL.createObjectURL(blob);
   };
+
   document.getElementById("fs").onclick = () => document.documentElement.requestFullscreen?.();
+
   document.getElementById("go").onclick = () => {
     const u = document.getElementById("url").value.trim();
     if(u) location.href = u;
   };
-  const pre = ${JSON.stringify(String(prefillUrl||""))};
+
   if(pre) document.getElementById("url").value = pre;
 </script></body></html>`;
 
     const doc = iframe.contentWindow.document;
-    doc.open(); doc.write(SHELL); doc.close();
+    doc.open();
+    doc.write(SHELL);
+    doc.close();
     try { iframe.contentWindow.focus(); } catch {}
   };
 
